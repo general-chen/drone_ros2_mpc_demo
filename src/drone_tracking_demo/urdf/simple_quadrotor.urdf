@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<robot name="simple_quadrotor">
+
+  <!-- Base frame attached to drone_body -->
+  <link name="drone_body"/>
+
+  <!-- Central body -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.35 0.25 0.08"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0.1 0.25 0.9 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="body_to_base" type="fixed">
+    <parent link="drone_body"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- X arm -->
+  <link name="arm_x">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.90 0.035 0.035"/>
+      </geometry>
+      <material name="dark_gray">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="base_to_arm_x" type="fixed">
+    <parent link="base_link"/>
+    <child link="arm_x"/>
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Y arm -->
+  <link name="arm_y">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.035 0.90 0.035"/>
+      </geometry>
+      <material name="dark_gray"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_arm_y" type="fixed">
+    <parent link="base_link"/>
+    <child link="arm_y"/>
+    <origin xyz="0 0 0.02" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rotor 1: front right -->
+  <link name="rotor_1">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.12" length="0.015"/>
+      </geometry>
+      <material name="light_gray">
+        <color rgba="0.75 0.75 0.75 0.85"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="base_to_rotor_1" type="fixed">
+    <parent link="base_link"/>
+    <child link="rotor_1"/>
+    <origin xyz="0.45 0.45 0.04" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rotor 2: front left -->
+  <link name="rotor_2">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.12" length="0.015"/>
+      </geometry>
+      <material name="light_gray"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_rotor_2" type="fixed">
+    <parent link="base_link"/>
+    <child link="rotor_2"/>
+    <origin xyz="-0.45 0.45 0.04" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rotor 3: rear left -->
+  <link name="rotor_3">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.12" length="0.015"/>
+      </geometry>
+      <material name="light_gray"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_rotor_3" type="fixed">
+    <parent link="base_link"/>
+    <child link="rotor_3"/>
+    <origin xyz="-0.45 -0.45 0.04" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Rotor 4: rear right -->
+  <link name="rotor_4">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.12" length="0.015"/>
+      </geometry>
+      <material name="light_gray"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_rotor_4" type="fixed">
+    <parent link="base_link"/>
+    <child link="rotor_4"/>
+    <origin xyz="0.45 -0.45 0.04" rpy="0 0 0"/>
+  </joint>
+
+</robot>
