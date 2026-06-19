@@ -1,5 +1,7 @@
 import os
 
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
@@ -8,6 +10,8 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
 
     pkg = get_package_share_directory('drone_tracking_demo')
+    wind_level_config = LaunchConfiguration('wind_level')
+    trajectory_mode_config = LaunchConfiguration('trajectory_mode')
 
     urdf_path = os.path.join(pkg, 'urdf', 'simple_quadrotor.urdf')
 
@@ -18,14 +22,16 @@ def generate_launch_description():
     sim_node = Node(
         package='drone_tracking_demo',
         executable='drone_simulator',
-        output='screen'
+        output='screen',
+        parameters=[{'wind_level': wind_level_config}]
     )
 
     # MPC controller
     mpc_node = Node(
         package='drone_tracking_demo',
         executable='mpc_tracker',
-        output='screen'
+        output='screen',
+        parameters=[{'trajectory_mode': trajectory_mode_config}]
     )
 
     # Robot state publisher (URDF → TF)
@@ -44,6 +50,14 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'wind_level',
+            default_value='strong'
+        ),
+        DeclareLaunchArgument(
+            'trajectory_mode',
+            default_value='circle'
+        ),
         sim_node,
         mpc_node,
         rsp_node,

@@ -13,6 +13,8 @@ from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 from visualization_msgs.msg import Marker
 
+from std_msgs.msg import Float32
+
 
 class MPCTracker(Node):
     def __init__(self):
@@ -20,6 +22,13 @@ class MPCTracker(Node):
 
         self.dt = 0.1          # MPC control interval
         self.t = 0.0
+        
+        self.err_pub = self.create_publisher(
+            Float32,
+            '/drone/tracking_error',
+            10
+        )
+        self.cumulative_abs_error_xy = 0.0
 
         # Current drone state
         self.x = 0.0
@@ -30,6 +39,21 @@ class MPCTracker(Node):
         self.radius = 2.0
         self.omega = 0.25
         self.z_ref = 1.0
+
+        self.declare_parameter("trajectory_mode", "circle")
+        self.trajectory_mode = (
+            self.get_parameter("trajectory_mode")
+            .get_parameter_value()
+            .string_value
+        )
+        supported_trajectory_modes = ["circle", "figure8", "random_smooth"]
+        if self.trajectory_mode not in supported_trajectory_modes:
+            self.get_logger().warning(
+                f'Invalid trajectory_mode "{self.trajectory_mode}". '
+                'Falling back to "circle".'
+            )
+            self.trajectory_mode = "circle"
+        self.get_logger().info(f'Trajectory mode set to: {self.trajectory_mode}')
 
         # MPC parameters
         self.N = 12            # prediction horizon
@@ -100,7 +124,9 @@ class MPCTracker(Node):
             'x', 'y', 'z',
             'error_xy', 'error_z', 'error_3d',
             'cmd_vx', 'cmd_vy', 'cmd_vz',
-            'solve_success', 'solve_cost'
+            'solve_success', 'solve_cost',
+            'error_x', 'error_y', 'error_z_signed',
+            'cumulative_abs_error_xy'
         ])
 
         self.timer = self.create_timer(self.dt, self.control_loop)
@@ -115,21 +141,28 @@ class MPCTracker(Node):
         self.odom_received = True
             
     def reference(self, t):
-
-        # Smooth pseudo-random trajectory using sin superposition
-        x_ref = (
-            2.0 * math.sin(0.25 * t) +
-            1.2 * math.sin(0.11 * t + 1.7) +
-            0.6 * math.sin(0.53 * t + 0.3)
-        )
-
-        y_ref = (
-            2.0 * math.cos(0.22 * t) +
-            1.0 * math.sin(0.17 * t + 2.1) +
-            0.5 * math.cos(0.41 * t)
-        )
-
-        z_ref = 1.0 + 0.3 * math.sin(0.3 * t)
+        if self.trajectory_mode == "circle":
+            x_ref = self.radius * math.cos(self.omega * t)
+            y_ref = self.radius * math.sin(self.omega * t)
+            z_ref = self.z_ref
+        elif self.trajectory_mode == "figure8":
+            x_ref = 2.0 * math.sin(0.25 * t)
+            y_ref = 1.2 * math.sin(0.5 * t)
+            z_ref = 1.0
+        elif self.trajectory_mode == "random_smooth":
+            x_ref = (
+                2.0 * math.sin(0.25 * t) +
+                1.2 * math.sin(0.11 * t + 1.7) +
+                0.6 * math.sin(0.53 * t + 0.3)
+            )
+            y_ref = (
+                2.0 * math.cos(0.22 * t) +
+                1.0 * math.sin(0.17 * t + 2.1) +
+                0.5 * math.cos(0.41 * t)
+            )
+            z_ref = 1.0 + 0.3 * math.sin(0.3 * t)
+        else:
+            raise ValueError(f'Unsupported trajectory mode: {self.trajectory_mode}')
 
         return np.array([x_ref, y_ref, z_ref], dtype=float)
 
@@ -232,6 +265,11 @@ class MPCTracker(Node):
         error_xy = math.sqrt(ex**2 + ey**2)
         error_z = abs(ez)
         error_3d = math.sqrt(ex**2 + ey**2 + ez**2)
+        self.cumulative_abs_error_xy += error_xy * self.dt
+
+        error_msg = Float32()
+        error_msg.data = float(error_xy)
+        self.err_pub.publish(error_msg)
 
         self.csv_writer.writerow([
             self.t,
@@ -239,8 +277,11 @@ class MPCTracker(Node):
             self.x, self.y, self.z,
             error_xy, error_z, error_3d,
             cmd.linear.x, cmd.linear.y, cmd.linear.z,
-            solve_success, solve_cost
+            solve_success, solve_cost,
+            ex, ey, ez,
+            self.cumulative_abs_error_xy
         ])
+        self.log_file.flush()
 
         self.publish_paths(x_ref, y_ref, z_ref)
         self.publish_markers(x_ref, y_ref, z_ref)

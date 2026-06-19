@@ -1,0 +1,128 @@
+You are working in a ROS 2 Jazzy Python package:
+
+~/ros2_ws/src/drone_tracking_demo
+
+Current branch:
+wind-disturbance-module
+
+The current system already works:
+- drone_simulator.py publishes /drone/odom and TF world -> drone_body
+- mpc_tracker.py subscribes to /drone/odom and publishes /drone/cmd_vel
+- full_demo.launch.py launches the simulator, MPC tracker, robot_state_publisher, and RViz
+- URDF quadrotor visualization works in RViz
+- wind disturbance module works visually
+
+Task:
+Add quantitative tracking metrics for wind disturbance analysis.
+
+Main goals:
+1. Publish real-time tracking error as a ROS topic.
+2. Improve MPC CSV logging.
+3. Add a standalone comparison plotting script for no-wind vs wind cases.
+4. Do not break existing demo behavior.
+
+Detailed requirements:
+
+A. Modify drone_tracking_demo/mpc_tracker.py
+
+1. Preserve all existing publishers/subscribers:
+   - subscribe: /drone/odom
+   - publish: /drone/cmd_vel
+   - publish: /drone/ref_path
+   - publish: /drone/actual_path
+   - publish markers
+
+2. Add a publisher:
+   /drone/tracking_error
+   message type: std_msgs/msg/Float32
+
+3. Add import:
+   from std_msgs.msg import Float32
+
+4. In each control loop, after computing ex, ey, ez:
+   error_xy = sqrt(ex^2 + ey^2)
+   publish error_xy to /drone/tracking_error.
+
+5. Keep the existing CSV file:
+   ~/ros2_ws/drone_tracking_logs/mpc_tracking_log.csv
+
+6. Extend CSV header to include:
+   error_x
+   error_y
+   error_z_signed
+   cumulative_abs_error_xy
+
+7. Track cumulative absolute XY error:
+   self.cumulative_abs_error_xy += error_xy * self.dt
+
+8. Each CSV row should include:
+   error_x = ex
+   error_y = ey
+   error_z_signed = ez
+   cumulative_abs_error_xy
+
+9. Keep existing columns:
+   time, x_ref, y_ref, z_ref, x, y, z, error_xy, error_z, error_3d,
+   cmd_vx, cmd_vy, cmd_vz, solve_success, solve_cost
+
+10. Do not remove any old columns; only append new columns at the end.
+
+B. Add new script at workspace root:
+   ~/ros2_ws/analyze_wind_metrics.py
+
+This script should:
+
+1. Load two CSV logs:
+   ~/ros2_ws/drone_tracking_logs/mpc_tracking_log_no_wind.csv
+   ~/ros2_ws/drone_tracking_logs/mpc_tracking_log_wind_strong.csv
+
+2. If files do not exist, print a clear instruction:
+   "Please copy mpc_tracking_log.csv to mpc_tracking_log_no_wind.csv after a no-wind run, and to mpc_tracking_log_wind_strong.csv after a strong-wind run."
+
+3. For each log, compute:
+   - mean XY error
+   - RMSE XY error
+   - max XY error
+   - steady-state mean XY error after 5 seconds
+   - steady-state RMSE XY error after 5 seconds
+   - gust-window mean XY error from 12 to 18 seconds
+   - gust-window RMSE XY error from 12 to 18 seconds
+   - recovery-window mean XY error from 18 to 25 seconds
+   - recovery-window RMSE XY error from 18 to 25 seconds
+
+4. Print a formatted table in terminal.
+
+5. Save plots to:
+   ~/ros2_ws/drone_tracking_logs/wind_metric_error_comparison.png
+   ~/ros2_ws/drone_tracking_logs/wind_metric_trajectory_comparison.png
+
+6. Plot 1:
+   time vs error_xy for no-wind and strong-wind cases.
+   Add vertical dashed lines at t=12 and t=18 to indicate gust window.
+
+7. Plot 2:
+   xy trajectory comparison:
+   reference path
+   actual no-wind path
+   actual strong-wind path
+
+8. Use matplotlib only. Do not use seaborn.
+
+C. Syntax checks
+
+Run:
+python3 -m py_compile src/drone_tracking_demo/drone_tracking_demo/mpc_tracker.py
+python3 -m py_compile analyze_wind_metrics.py
+
+D. Do not modify:
+- drone_simulator.py
+- path_tracker.py
+- URDF files
+- launch files
+- setup.py
+- package.xml
+
+Return:
+- changed files
+- short summary
+- exact commands to run no-wind and wind-strong experiments

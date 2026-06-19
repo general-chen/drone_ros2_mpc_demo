@@ -30,6 +30,37 @@ class DroneSimulator(Node):
         self.tau_xy = 0.6
         self.tau_z = 0.4
 
+        # Wind disturbance model
+        self.declare_parameter("wind_level", "strong")
+        self.wind_level = self.get_parameter("wind_level").get_parameter_value().string_value
+        self.wind_scale_factors = {
+            "none": 0.0,
+            "mild": 0.5,
+            "moderate": 1.0,
+            "strong": 2.0,
+            "extreme": 3.0,
+        }
+        if self.wind_level not in self.wind_scale_factors:
+            self.get_logger().warning(
+                f'Invalid wind_level "{self.wind_level}". Falling back to "strong".'
+            )
+            self.wind_level = "strong"
+        self.get_logger().info(f'Wind level set to: {self.wind_level}')
+        self.enable_burst_gust = True
+
+        # Constant background wind velocity disturbance
+        self.wind_bias_x = 0.15
+        self.wind_bias_y = -0.10
+        self.wind_bias_z = 0.00
+
+        # Time-varying gust disturbance
+        self.wind_amp_x = 0.25
+        self.wind_amp_y = 0.20
+        self.wind_amp_z = 0.05
+
+        self.sim_time = 0.0
+        self.last_wind_log_time = -999.0
+
         # commands
         self.vx_cmd = 0.0
         self.vy_cmd = 0.0
@@ -63,16 +94,45 @@ class DroneSimulator(Node):
         self.vz_cmd = msg.linear.z
         self.wz_cmd = msg.angular.z
 
+    def compute_wind_disturbance(self, t):
+        scale = self.wind_scale_factors.get(self.wind_level, self.wind_scale_factors["strong"])
+
+        if scale == 0.0:
+            return 0.0, 0.0, 0.0
+
+        wind_vx = self.wind_bias_x + self.wind_amp_x * math.sin(0.7 * t)
+        wind_vy = self.wind_bias_y + self.wind_amp_y * math.sin(0.5 * t + 1.2)
+        wind_vz = self.wind_bias_z + self.wind_amp_z * math.sin(0.9 * t + 0.4)
+
+        if self.enable_burst_gust and 12.0 <= t <= 18.0:
+            wind_vx += 0.40
+            wind_vy += -0.30
+            wind_vz += 0.08
+
+        return scale * wind_vx, scale * wind_vy, scale * wind_vz
+
     def update(self):
         # first-order lag dynamics
         self.vx += (self.vx_cmd - self.vx) * self.dt / self.tau_xy
         self.vy += (self.vy_cmd - self.vy) * self.dt / self.tau_xy
         self.vz += (self.vz_cmd - self.vz) * self.dt / self.tau_z
 
-        self.x += self.vx * self.dt
-        self.y += self.vy * self.dt
-        self.z += self.vz * self.dt
+        wind_vx, wind_vy, wind_vz = self.compute_wind_disturbance(self.sim_time)
+        vx_ground = self.vx + wind_vx
+        vy_ground = self.vy + wind_vy
+        vz_ground = self.vz + wind_vz
+
+        self.x += vx_ground * self.dt
+        self.y += vy_ground * self.dt
+        self.z += vz_ground * self.dt
         self.yaw += self.wz_cmd * self.dt
+        self.sim_time += self.dt
+
+        if self.sim_time - self.last_wind_log_time >= 2.0:
+            self.get_logger().info(
+                f'Wind level: {self.wind_level} | vx={wind_vx:.3f}, vy={wind_vy:.3f}, vz={wind_vz:.3f}'
+            )
+            self.last_wind_log_time = self.sim_time
 
         # odometry
         odom = Odometry()
@@ -84,9 +144,9 @@ class DroneSimulator(Node):
         odom.pose.pose.position.y = self.y
         odom.pose.pose.position.z = self.z
 
-        odom.twist.twist.linear.x = self.vx
-        odom.twist.twist.linear.y = self.vy
-        odom.twist.twist.linear.z = self.vz
+        odom.twist.twist.linear.x = vx_ground
+        odom.twist.twist.linear.y = vy_ground
+        odom.twist.twist.linear.z = vz_ground
 
         self.odom_pub.publish(odom)
 
