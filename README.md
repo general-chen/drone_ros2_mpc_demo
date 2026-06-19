@@ -151,6 +151,20 @@ Example metric results:
 - Strong-wind gust-window RMSE from 12-18 s: `0.4001 m`
 - Gust-window RMSE increase: about `32.8x`
 
+## Demo Results
+
+![ROS 2 RViz UAV tracking visualization with no wind](src/drone_tracking_demo/figure/circle_no.png)
+
+ROS 2 RViz UAV tracking visualization for the circular reference trajectory with no wind.
+
+![Strong-wind circular trajectory tracking in RViz](src/drone_tracking_demo/figure/circle_strong.png)
+
+Strong-wind circular trajectory tracking result in RViz, intended for comparison with the no-wind trajectory above.
+
+![Extreme-wind disturbance tracking view in RViz](src/drone_tracking_demo/figure/circle_extreme.png)
+
+Extreme-wind disturbance tracking view in RViz; this qualitatively illustrates larger tracking-error behavior under severe wind disturbance rather than a numeric metric plot.
+
 ## Suggested Demo Video Sequence
 
 1. No-wind circle tracking
