@@ -47,6 +47,7 @@ class PathTracker(Node):
         self.radius = 2.0
         self.omega = 0.25
         self.z_ref = 1.0
+        self.trajectory_mode = "circle"
 
         self.odom_received = False
 
@@ -104,14 +105,40 @@ class PathTracker(Node):
         self.odom_received = True
 
     def reference(self, t):
-        # Circular reference path
-        x_ref = self.radius * math.cos(self.omega * t)
-        y_ref = self.radius * math.sin(self.omega * t)
-        z_ref = self.z_ref
+        if self.trajectory_mode == "circle":
+            x_ref = self.radius * math.cos(self.omega * t)
+            y_ref = self.radius * math.sin(self.omega * t)
+            z_ref = self.z_ref
 
-        vx_ref = -self.radius * self.omega * math.sin(self.omega * t)
-        vy_ref = self.radius * self.omega * math.cos(self.omega * t)
-        vz_ref = 0.0
+            vx_ref = -self.radius * self.omega * math.sin(self.omega * t)
+            vy_ref = self.radius * self.omega * math.cos(self.omega * t)
+            vz_ref = 0.0
+        elif self.trajectory_mode == "figure8":
+            x_ref = 2.0 * math.sin(0.25 * t)
+            y_ref = 1.2 * math.sin(0.5 * t)
+            z_ref = 1.0
+
+            vx_ref = 0.0
+            vy_ref = 0.0
+            vz_ref = 0.0
+        elif self.trajectory_mode == "random_smooth":
+            x_ref = (
+                2.0 * math.sin(0.25 * t) +
+                1.2 * math.sin(0.11 * t + 1.7) +
+                0.6 * math.sin(0.53 * t + 0.3)
+            )
+            y_ref = (
+                2.0 * math.cos(0.22 * t) +
+                1.0 * math.sin(0.17 * t + 2.1) +
+                0.5 * math.cos(0.41 * t)
+            )
+            z_ref = 1.0 + 0.3 * math.sin(0.3 * t)
+
+            vx_ref = 0.0
+            vy_ref = 0.0
+            vz_ref = 0.0
+        else:
+            raise ValueError(f'Unsupported trajectory mode: {self.trajectory_mode}')
 
         return x_ref, y_ref, z_ref, vx_ref, vy_ref, vz_ref
 

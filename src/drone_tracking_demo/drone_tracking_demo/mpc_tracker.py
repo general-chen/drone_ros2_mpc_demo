@@ -30,6 +30,7 @@ class MPCTracker(Node):
         self.radius = 2.0
         self.omega = 0.25
         self.z_ref = 1.0
+        self.trajectory_mode = "circle"
 
         # MPC parameters
         self.N = 12            # prediction horizon
@@ -115,21 +116,28 @@ class MPCTracker(Node):
         self.odom_received = True
             
     def reference(self, t):
-
-        # Smooth pseudo-random trajectory using sin superposition
-        x_ref = (
-            2.0 * math.sin(0.25 * t) +
-            1.2 * math.sin(0.11 * t + 1.7) +
-            0.6 * math.sin(0.53 * t + 0.3)
-        )
-
-        y_ref = (
-            2.0 * math.cos(0.22 * t) +
-            1.0 * math.sin(0.17 * t + 2.1) +
-            0.5 * math.cos(0.41 * t)
-        )
-
-        z_ref = 1.0 + 0.3 * math.sin(0.3 * t)
+        if self.trajectory_mode == "circle":
+            x_ref = self.radius * math.cos(self.omega * t)
+            y_ref = self.radius * math.sin(self.omega * t)
+            z_ref = self.z_ref
+        elif self.trajectory_mode == "figure8":
+            x_ref = 2.0 * math.sin(0.25 * t)
+            y_ref = 1.2 * math.sin(0.5 * t)
+            z_ref = 1.0
+        elif self.trajectory_mode == "random_smooth":
+            x_ref = (
+                2.0 * math.sin(0.25 * t) +
+                1.2 * math.sin(0.11 * t + 1.7) +
+                0.6 * math.sin(0.53 * t + 0.3)
+            )
+            y_ref = (
+                2.0 * math.cos(0.22 * t) +
+                1.0 * math.sin(0.17 * t + 2.1) +
+                0.5 * math.cos(0.41 * t)
+            )
+            z_ref = 1.0 + 0.3 * math.sin(0.3 * t)
+        else:
+            raise ValueError(f'Unsupported trajectory mode: {self.trajectory_mode}')
 
         return np.array([x_ref, y_ref, z_ref], dtype=float)
 
