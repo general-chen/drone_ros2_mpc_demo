@@ -13,6 +13,8 @@ from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 from visualization_msgs.msg import Marker
 
+from std_msgs.msg import Float32
+
 
 class MPCTracker(Node):
     def __init__(self):
@@ -20,6 +22,13 @@ class MPCTracker(Node):
 
         self.dt = 0.1          # MPC control interval
         self.t = 0.0
+        
+        self.err_pub = self.create_publisher(
+            Float32,
+            '/drone/tracking_error',
+            10
+        )
+        self.cumulative_abs_error_xy = 0.0
 
         # Current drone state
         self.x = 0.0
@@ -101,7 +110,9 @@ class MPCTracker(Node):
             'x', 'y', 'z',
             'error_xy', 'error_z', 'error_3d',
             'cmd_vx', 'cmd_vy', 'cmd_vz',
-            'solve_success', 'solve_cost'
+            'solve_success', 'solve_cost',
+            'error_x', 'error_y', 'error_z_signed',
+            'cumulative_abs_error_xy'
         ])
 
         self.timer = self.create_timer(self.dt, self.control_loop)
@@ -240,6 +251,11 @@ class MPCTracker(Node):
         error_xy = math.sqrt(ex**2 + ey**2)
         error_z = abs(ez)
         error_3d = math.sqrt(ex**2 + ey**2 + ez**2)
+        self.cumulative_abs_error_xy += error_xy * self.dt
+
+        error_msg = Float32()
+        error_msg.data = float(error_xy)
+        self.err_pub.publish(error_msg)
 
         self.csv_writer.writerow([
             self.t,
@@ -247,8 +263,11 @@ class MPCTracker(Node):
             self.x, self.y, self.z,
             error_xy, error_z, error_3d,
             cmd.linear.x, cmd.linear.y, cmd.linear.z,
-            solve_success, solve_cost
+            solve_success, solve_cost,
+            ex, ey, ez,
+            self.cumulative_abs_error_xy
         ])
+        self.log_file.flush()
 
         self.publish_paths(x_ref, y_ref, z_ref)
         self.publish_markers(x_ref, y_ref, z_ref)
