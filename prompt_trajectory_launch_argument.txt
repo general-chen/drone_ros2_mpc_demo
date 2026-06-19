@@ -1,0 +1,106 @@
+You are working in a ROS 2 Jazzy Python package:
+
+~/ros2_ws/src/drone_tracking_demo
+
+Current branch:
+wind-disturbance-module
+
+The current system works:
+- full_demo.launch.py supports wind_level as a launch argument
+- drone_simulator.py reads wind_level as a ROS parameter
+- mpc_tracker.py and path_tracker.py already support self.trajectory_mode internally
+- available trajectory modes are likely:
+  "circle"
+  "figure8"
+  "random_smooth"
+
+Task:
+Make trajectory_mode configurable from the ROS 2 launch command.
+
+Required behavior:
+The user should be able to run:
+
+ros2 launch drone_tracking_demo full_demo.launch.py wind_level:=strong trajectory_mode:=circle
+ros2 launch drone_tracking_demo full_demo.launch.py wind_level:=strong trajectory_mode:=figure8
+ros2 launch drone_tracking_demo full_demo.launch.py wind_level:=strong trajectory_mode:=random_smooth
+
+A. Modify drone_tracking_demo/mpc_tracker.py
+
+1. Add a ROS parameter named:
+   trajectory_mode
+
+2. Declare it in __init__:
+   self.declare_parameter("trajectory_mode", "circle")
+
+3. Read it:
+   self.trajectory_mode = self.get_parameter("trajectory_mode").get_parameter_value().string_value
+
+4. Validate supported values:
+   ["circle", "figure8", "random_smooth"]
+
+5. If invalid, log a warning and fall back to "circle".
+
+6. Log at startup:
+   Trajectory mode set to: <trajectory_mode>
+
+7. Preserve all existing behavior:
+   - subscribe /drone/odom
+   - publish /drone/cmd_vel
+   - publish /drone/ref_path
+   - publish /drone/actual_path
+   - publish /drone/reference_marker
+   - publish /drone/drone_marker if it still exists
+   - publish /drone/tracking_error
+   - CSV logging
+   - MPC optimization
+   - reference function behavior
+
+B. Modify drone_tracking_demo/path_tracker.py
+
+1. Add the same ROS parameter:
+   trajectory_mode
+
+2. Declare it in __init__:
+   self.declare_parameter("trajectory_mode", "circle")
+
+3. Read it and validate:
+   ["circle", "figure8", "random_smooth"]
+
+4. If invalid, log a warning and fall back to "circle".
+
+5. Log at startup:
+   Trajectory mode set to: <trajectory_mode>
+
+6. Preserve all existing P-controller behavior and logging.
+
+C. Modify launch/full_demo.launch.py
+
+1. Add launch argument:
+   trajectory_mode
+   default_value="circle"
+
+2. Pass this argument as a parameter to the MPC tracker node:
+   parameters=[{"trajectory_mode": trajectory_mode_config}]
+
+3. Preserve existing wind_level launch argument and simulator parameter passing.
+
+4. Do not change URDF loading, robot_state_publisher, RViz, or simulator launch behavior.
+
+5. It is OK that full_demo.launch.py launches only mpc_tracker, not path_tracker.
+
+D. Syntax checks
+
+Run:
+python3 -m py_compile src/drone_tracking_demo/drone_tracking_demo/mpc_tracker.py
+python3 -m py_compile src/drone_tracking_demo/drone_tracking_demo/path_tracker.py
+python3 -m py_compile src/drone_tracking_demo/launch/full_demo.launch.py
+
+E. Do not modify:
+- drone_simulator.py except if absolutely necessary
+- URDF files
+- setup.py
+- package.xml
+
+Return:
+- files changed
+- exact launch commands for circle, figure8, and random_smooth under strong wind

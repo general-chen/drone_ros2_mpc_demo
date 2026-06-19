@@ -11,6 +11,7 @@ def generate_launch_description():
 
     pkg = get_package_share_directory('drone_tracking_demo')
     wind_level_config = LaunchConfiguration('wind_level')
+    trajectory_mode_config = LaunchConfiguration('trajectory_mode')
 
     urdf_path = os.path.join(pkg, 'urdf', 'simple_quadrotor.urdf')
 
@@ -29,7 +30,8 @@ def generate_launch_description():
     mpc_node = Node(
         package='drone_tracking_demo',
         executable='mpc_tracker',
-        output='screen'
+        output='screen',
+        parameters=[{'trajectory_mode': trajectory_mode_config}]
     )
 
     # Robot state publisher (URDF → TF)
@@ -51,6 +53,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'wind_level',
             default_value='strong'
+        ),
+        DeclareLaunchArgument(
+            'trajectory_mode',
+            default_value='circle'
         ),
         sim_node,
         mpc_node,

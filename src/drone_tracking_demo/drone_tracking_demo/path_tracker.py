@@ -47,7 +47,21 @@ class PathTracker(Node):
         self.radius = 2.0
         self.omega = 0.25
         self.z_ref = 1.0
-        self.trajectory_mode = "circle"
+
+        self.declare_parameter("trajectory_mode", "circle")
+        self.trajectory_mode = (
+            self.get_parameter("trajectory_mode")
+            .get_parameter_value()
+            .string_value
+        )
+        supported_trajectory_modes = ["circle", "figure8", "random_smooth"]
+        if self.trajectory_mode not in supported_trajectory_modes:
+            self.get_logger().warning(
+                f'Invalid trajectory_mode "{self.trajectory_mode}". '
+                'Falling back to "circle".'
+            )
+            self.trajectory_mode = "circle"
+        self.get_logger().info(f'Trajectory mode set to: {self.trajectory_mode}')
 
         self.odom_received = False
 
