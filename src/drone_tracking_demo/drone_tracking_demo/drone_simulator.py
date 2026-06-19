@@ -31,7 +31,21 @@ class DroneSimulator(Node):
         self.tau_z = 0.4
 
         # Wind disturbance model
-        self.enable_wind = True
+        self.declare_parameter("wind_level", "strong")
+        self.wind_level = self.get_parameter("wind_level").get_parameter_value().string_value
+        self.wind_scale_factors = {
+            "none": 0.0,
+            "mild": 0.5,
+            "moderate": 1.0,
+            "strong": 2.0,
+            "extreme": 3.0,
+        }
+        if self.wind_level not in self.wind_scale_factors:
+            self.get_logger().warning(
+                f'Invalid wind_level "{self.wind_level}". Falling back to "strong".'
+            )
+            self.wind_level = "strong"
+        self.get_logger().info(f'Wind level set to: {self.wind_level}')
         self.enable_burst_gust = True
 
         # Constant background wind velocity disturbance
@@ -45,7 +59,7 @@ class DroneSimulator(Node):
         self.wind_amp_z = 0.05
 
         self.sim_time = 0.0
-        self.last_wind_log_time = -2.0
+        self.last_wind_log_time = -999.0
 
         # commands
         self.vx_cmd = 0.0
@@ -81,7 +95,9 @@ class DroneSimulator(Node):
         self.wz_cmd = msg.angular.z
 
     def compute_wind_disturbance(self, t):
-        if not self.enable_wind:
+        scale = self.wind_scale_factors.get(self.wind_level, self.wind_scale_factors["strong"])
+
+        if scale == 0.0:
             return 0.0, 0.0, 0.0
 
         wind_vx = self.wind_bias_x + self.wind_amp_x * math.sin(0.7 * t)
@@ -89,13 +105,11 @@ class DroneSimulator(Node):
         wind_vz = self.wind_bias_z + self.wind_amp_z * math.sin(0.9 * t + 0.4)
 
         if self.enable_burst_gust and 12.0 <= t <= 18.0:
-            burst_phase = (t - 12.0) / 6.0
-            burst_envelope = math.sin(math.pi * burst_phase)
-            wind_vx += 0.35 * burst_envelope
-            wind_vy += -0.20 * burst_envelope
-            wind_vz += 0.08 * burst_envelope
+            wind_vx += 0.40
+            wind_vy += -0.30
+            wind_vz += 0.08
 
-        return wind_vx, wind_vy, wind_vz
+        return scale * wind_vx, scale * wind_vy, scale * wind_vz
 
     def update(self):
         # first-order lag dynamics
@@ -116,7 +130,7 @@ class DroneSimulator(Node):
 
         if self.sim_time - self.last_wind_log_time >= 2.0:
             self.get_logger().info(
-                f'Wind disturbance: vx={wind_vx:.3f}, vy={wind_vy:.3f}, vz={wind_vz:.3f}'
+                f'Wind level: {self.wind_level} | vx={wind_vx:.3f}, vy={wind_vy:.3f}, vz={wind_vz:.3f}'
             )
             self.last_wind_log_time = self.sim_time
 
